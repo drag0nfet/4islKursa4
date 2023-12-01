@@ -15,14 +15,16 @@ def givenRotation(a, b):
     """
     r = np.hypot(a, b)
     c = a / r
-    s = -b / r
+    s = b / r
+    #print(c, s)
     return c, s
 
 def gmresMetod(A, b, x0, eps):
+    over = False
     p = 0
     n = len(b)
     h = np.zeros((n + 1, n))
-    e1 = np.zeros(n)
+    e1 = np.zeros(n + 1)
     e1[0] = 1
     r0 = b - A @ x0
     beta = np.linalg.norm(r0)
@@ -31,9 +33,9 @@ def gmresMetod(A, b, x0, eps):
     v[0] = r0 / beta
     for j in range(n):
         w = A @ v[j]
-        for i in range(j):
+        for i in range(j + 1):
             h[i, j] = w @ v[i]
-            w -= h[i, j] * v[i]
+            w = w - h[i, j] * v[i]
         h[j + 1, j] = np.linalg.norm(w)
         if h[j + 1, j] == 0:
             p = j
@@ -52,19 +54,21 @@ def gmresMetod(A, b, x0, eps):
         h[j, j] = temp1
         h[j + 1, j] = temp2
 
-        # точка 1
-        temp1 = cj * g[j]
-        temp2 = sj * g[j + 1]
-        g[j] = temp1 + temp2
-        g[j + 1] = -sj * g[j] + cj * g[j + 1]
-        # точка 2
+        temp1 = cj * g[j] + sj * g[j + 1]
+        temp2 = -sj * g[j] + cj * g[j + 1]
+        g[j] = temp1
+        g[j + 1] = temp2
+
         if abs(g[j + 1]) < eps:
+            over = True
             p = j
             break
 
-    y, _, _, _ = np.linalg.lstsq(h[:p + 1, :p + 1], g[:p + 1], rcond=None)
-    x = x0 + np.dot(v[:p + 1].T, y)
-    return x
+    y = np.linalg.solve(h[:p + 1, :p + 1], g[:p + 1])
+    dd = np.dot(v[:p + 1].T, y)
+
+    x = x0 + dd
+    return x, over
 
 
 def f(x):
@@ -72,8 +76,7 @@ def f(x):
 
 def realize():
     eps = 10**(-4)
-    print(math.pi / 4)
-    for i in range(6, 20):
+    for i in range(6, 10):
         h = math.pi / (i * 4)
         n = i
         xs = np.linspace(0, math.pi / 4, n + 1)
@@ -87,9 +90,20 @@ def realize():
         A[n, n] = 1
         for j in range(n+1):
             b[j] = math.sin(xs[j])
-        #print(A)
-        #print(b)
-        #ans = gmres(A, b, )
+        print(A)
+        print(b)
+        x_exact = np.linalg.solve(A, b)
+        print("Точное решение:", x_exact)
+        ans, metodOver = gmresMetod(A, b, b, eps)
+        max_iter = 50000
+        iter = 0
+        while not metodOver and iter < max_iter:
+            ans, metodOver = gmresMetod(A, b, b, eps)
+            iter += 1
+        print(n, iter, ans)
+        print("diffs:")
+        for i in range(len(A)):
+            print(abs(ans[i] - x_exact[i]))
         break
 
 
@@ -97,19 +111,28 @@ def test():
     A = np.array([[1, 1], [2, 6]])
     b = np.array([3, -4])
 
-    # Начальное приближение
-    x_0 = np.zeros_like(b)
-    result = gmresMetod(A, b, x_0, 1e-6)
-    print(f"Приближенное решение с начальным приближением {x_0}:", result)
-
-    # Новое начальное приближение
-    x_0 = np.array([3, 0])
-    result = gmresMetod(A, b, x_0, 1e-6)
-    print(f"Приближенное решение с начальным приближением {x_0}:", result)
-
     # Точное решение
     x_exact = np.linalg.solve(A, b)
     print("Точное решение:", x_exact)
 
-    
-test()
+    # Начальное приближение
+    x_0 = np.zeros_like(b)
+    ans, metodOver = gmresMetod(A, b, x_0, 10**(-4))
+    max_iter = 50000
+    iter = 0
+    while not metodOver and iter < max_iter:
+        ans, metodOver = gmresMetod(A, b, ans, 10**(-4))
+        iter += 1
+    print(2, iter, ans)
+    print("diffs:")
+    for i in range(len(A)):
+        print(abs(ans[i] - x_exact[i]))
+
+
+
+realize()
+
+# main 10
+# побочные 1
+# x 1 2 3 4 5...
+# b = Ax
