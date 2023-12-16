@@ -4,24 +4,14 @@ import math
 
 
 def givenRotation(a, b):
-    """
-    Вычисляет коэффициенты c и s для плоского вращения Гивенса.
-
-    Параметры:
-    a, b: Элементы, которые нужно обнулить (второй элемент b).
-
-    Возвращает:
-    c, s: Коэффициенты плоского вращения.
-    """
     r = np.hypot(a, b)
     c = a / r
     s = b / r
-    #print(c, s)
     return c, s
 
 def gmresMetod(A, b, x0, eps):
     over = False
-    p = 0
+    p = len(b) - 1
     n = len(b)
     h = np.zeros((n + 1, n))
     e1 = np.zeros(n + 1)
@@ -33,24 +23,24 @@ def gmresMetod(A, b, x0, eps):
     v[0] = r0 / beta
     for j in range(n):
         w = A @ v[j]
-        for i in range(j + 1):
-            h[i, j] = w @ v[i]
+        for i in range(j + 1):  # i = [0, j], j = [0, n)
+            #  h[i, j] = w @ v[i]  # last h[j, j]
+            h[i, j] = np.dot(w, v[i])
             w = w - h[i, j] * v[i]
         h[j + 1, j] = np.linalg.norm(w)
-        if h[j + 1, j] == 0:
+        if h[j + 1, j] == 0:  # если w разложили по базису
             p = j
             break
         v[j + 1] = w / h[j + 1, j]
         for i in range(j):
             ci, si = givenRotation(h[i, j], h[i + 1, j])
             temp1 = ci * h[i, j] + si * h[i + 1, j]
-            temp2 = -si * h[i, j] + ci * h[i + 1, j]
             h[i, j] = temp1
-            h[i + 1, j] = temp2
+            h[i + 1, j] = 0
 
         cj, sj = givenRotation(h[j, j], h[j + 1, j])
         temp1 = cj * h[j, j] + sj * h[j + 1, j]
-        temp2 = -sj * h[j, j] + cj * h[j + 1, j]
+        temp2 = 0
         h[j, j] = temp1
         h[j + 1, j] = temp2
 
@@ -66,6 +56,7 @@ def gmresMetod(A, b, x0, eps):
 
     y = np.linalg.solve(h[:p + 1, :p + 1], g[:p + 1])
     dd = np.dot(v[:p + 1].T, y)
+    #  dd = v * y
 
     x = x0 + dd
     return x, over
@@ -82,33 +73,36 @@ def realize():
         xs = np.linspace(0, math.pi / 4, n + 1)
         A = np.zeros((n + 1, n + 1))
         b = np.zeros(n + 1)
-        for j in range(1, n):
-            A[j - 1, j - 1] = -1 / h ** 2
-            A[j - 1, j + 1] = -1 / h ** 2
-            A[j - 1, j] = 2 / h ** 2
-        A[n - 1, 0] = 1
+        for j in range(2, n + 1):
+            A[j - 1, j - 2] = -1 / h ** 2
+            A[j - 1, j] = -1 / h ** 2
+            A[j - 1, j - 1] = 2 / h ** 2
+        A[0, 0] = 1
         A[n, n] = 1
         for j in range(n+1):
             b[j] = math.sin(xs[j])
+        b[0] = 2
+        b[n] = ((2 ** (1/2)) + 4) / 2
         print(A)
         print(b)
         x_exact = np.linalg.solve(A, b)
         print("Точное решение:", x_exact)
-        ans, metodOver = gmresMetod(A, b, b, eps)
-        max_iter = 50000
+        x_0 = np.zeros_like(b)
+        ans, metodOver = gmresMetod(A, b, x_0, eps)
+        max_iter = 2
         iter = 0
         while not metodOver and iter < max_iter:
-            ans, metodOver = gmresMetod(A, b, b, eps)
+            ans, metodOver = gmresMetod(A, b, ans, eps)
             iter += 1
         print(n, iter, ans)
         print("diffs:")
-        for i in range(len(A)):
-            print(abs(ans[i] - x_exact[i]))
+        #for i in range(len(A)):
+            #print(abs(ans[i] - x_exact[i]))
         break
 
 
 def test():
-    A = np.array([[1, 1], [2, 6]])
+    A = np.array([[1, 7], [2, 6]])
     b = np.array([3, -4])
 
     # Точное решение
@@ -123,6 +117,9 @@ def test():
     while not metodOver and iter < max_iter:
         ans, metodOver = gmresMetod(A, b, ans, 10**(-4))
         iter += 1
+        print(ans)
+        if iter == 15:
+            break
     print(2, iter, ans)
     print("diffs:")
     for i in range(len(A)):
@@ -130,9 +127,10 @@ def test():
 
 
 
-realize()
+test()
 
 # main 10
 # побочные 1
 # x 1 2 3 4 5...
 # b = Ax
+
